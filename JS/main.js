@@ -20,38 +20,13 @@ const formLogin = `
             <input type="password" class="form-control" placeholder="Contraseña" required>
         </div>
         <div id="error"></div>
-        <div id="btnInicarSesion"></div>
+        <button type="submit" class="btn btn-primary">Iniciar sesión</button>
     </form>
 </div>`;
-
-const btnInicarSesionNormal = `
-<button type="submit" class="btn btn-primary" id="btnIniciarSesion" >Iniciar sesión</button>
-`;
-
-const btnInicarSesionCarga = `
-<button class="btn btn-primary" type="button" id="btnIniciarSesionCarga" disabled>
-  <span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span>
-  Iniciar sesión
-</button>
-`;
 
 const formLoginError = `
 <div class="alert alert-danger" role="alert">
     Usuario o clave incorrecto
-</div>`;
-
-const mensajeErrorIngresoRegistros = `
-<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
-    <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-        <div class="toast-header">
-            <i class="bi bi-exclamation-triangle-fill mx-1 link-warning"></i>
-            <strong class="me-auto">Error General</strong>
-            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-        </div>
-        <div class="toast-body">
-            No se encontraron alumnos en el registro</br>
-        </div>
-    </div>
 </div>`;
 
 const mensajeErrorBusquedaAlumnos = `
@@ -251,93 +226,51 @@ let promediar = operacion("/");
 
 function cerrarSesion() {
     const credenciales = [];
-    sessionStorage.setItem("credenciales", JSON.stringify(credenciales));
+    sessionStorage.setItem("usuario", JSON.stringify(credenciales));
     usuarioPanel = "";
     login();
 }
 
-async function obtenerKey() {
-    const response = await fetch(
-      "https://6286699396bccbf32d74c7a5.mockapi.io/api/v1/key"
-    );
-    const data = await response.json();
-    return data;
-}
-  
-async function passwordCheck(clave, claveEnc) {
-    const data = await obtenerKey();
-    const key = CryptoJS.enc.Hex.parse(data[0].key);
-    const iv = CryptoJS.enc.Hex.parse(data[0].iv);
-    let encrypted = CryptoJS.AES.encrypt(clave, key, { iv: iv });
-    if (encrypted.toString() === claveEnc) {
-      return true;
-    } else {
-      return false;
-    }
-}
-
 function chequeoOnline() {
-    let usuarioSesion = JSON.parse(sessionStorage.getItem("credenciales")) || [];
+    let usuarioSesion = JSON.parse(sessionStorage.getItem("usuario")) || [];
     if (usuarioSesion.length === 0){
         return false;
     } else {
-        usuarioPanel = usuarioSesion[0].usuario;
+        usuarioPanel = usuarioSesion[0];
         return true
     }
 }
 
-async function loginApi(usuario, clave) {
-    let sesion = [];
-    const response = await fetch(
-      "https://6286699396bccbf32d74c7a5.mockapi.io/api/v1/user"
-    );
-    const data = await response.json();
-    for (let i = 0; i <= data.length - 1; i++) {
-      if (usuario === data[i].username) {
-        usuarioPanel = data[i].firstName + " " + data[i].lastName;
-        if (await passwordCheck(clave, data[i].password)) {
-          sesion.push({
-            id: data[i].id,
-            usuario: usuarioPanel,
-            username: data[i].username
-          });
-          let sesionJSON = JSON.stringify(sesion);
-          sessionStorage.setItem("credenciales",sesionJSON);
-        }
-      }
-    }
-    if (sesion.length === 0){
-      console.log("Usuario no encontrado o contraseña incorrecta");
-      return false;
+function chequeoDatos(usuario,clave){
+    if (usuario === "admin" || clave === "admin") {
+        const credenciales = [usuario,clave];
+        sessionStorage.setItem("usuario", JSON.stringify(credenciales));
+        usuarioPanel = usuario;
+        init();
+        return true;
     } else {
-      return true;
+        return false;
     }
 }
 
 function login() {
     if (chequeoOnline() === false){
+        console.log(chequeoOnline());
         limiparPantalla();
         DivFormulario.innerHTML = formLogin
         let formLoginWeb = document.getElementById("ingresoSesion");
-        let btnInicarSesion = document.getElementById("btnInicarSesion")
-        btnInicarSesion.innerHTML = btnInicarSesionNormal;
 
         formLoginWeb.addEventListener("submit", (e) => {
             e.preventDefault();
-            btnInicarSesion.innerHTML = btnInicarSesionCarga;
-            loginApi(e.target.children[1].children[1].value,e.target.children[2].children[1].value).then(ret => {
-                if (ret === true) {
-                    init();
-                } else {
-                    btnInicarSesion.innerHTML = btnInicarSesionNormal;
-                    let errorDiv = document.getElementById("error");
-                    errorDiv.innerHTML = formLoginError
-                }
-            });
+            if (chequeoDatos(e.target.children[1].children[1].value,e.target.children[2].children[1].value) === false){
+                let errorDiv = document.getElementById("error");
+                errorDiv.innerHTML = formLoginError
+            }
         });
     } else {
         init();
     }
+    
 }
 
 function init() {
@@ -461,7 +394,6 @@ function datosAlumnos(usuariosIngresados){
             <li class="breadcrumb-item active" aria-current="page">Ingesta de datos</li>
         </ol>
     </nav>
-    ${mensajeErrorIngresoRegistros}
     <form id="formAlumno" class="my-3 was-validated"></form>`;
 
     let padreAlumnos = document.getElementById("formAlumno");
@@ -485,20 +417,16 @@ function datosAlumnos(usuariosIngresados){
 
     formularioAlumno.addEventListener("submit", (e) => {
         e.preventDefault();
-        if (cantidad >= 1){
-            for (i=0; i <= (cantidad-1); i++){
-                console.log(e.target.children[1].children[0].children[i].children[1].children[1].children[0].children[1].value);
-                let nombreAlumno = e.target.children[1].children[0].children[i].children[1].children[0].children[0].children[1].value;
-                let apellidoAlumno = e.target.children[1].children[0].children[i].children[1].children[1].children[0].children[1].value;
-                let notaAlumno = e.target.children[1].children[0].children[i].children[1].children[2].children[0].children[1].value;
-                console.log(`Generando alumno ${(i+1)}:\n   - Nombre: ${nombreAlumno} \n   - Apellido: ${apellidoAlumno}\n   - Nota: ${notaAlumno}`);
-                Alumnos.push(new Alumno(i,(i+1),nombreAlumno,apellidoAlumno,notaAlumno));
-            }
-            limiparPantalla();
-            tablaResultados();
-        } else {
-            tiggerToast();
+        for (i=0; i <= (cantidad-1); i++){
+            console.log(e.target.children[1].children[0].children[i].children[1].children[1].children[0].children[1].value);
+            let nombreAlumno = e.target.children[1].children[0].children[i].children[1].children[0].children[0].children[1].value;
+            let apellidoAlumno = e.target.children[1].children[0].children[i].children[1].children[1].children[0].children[1].value;
+            let notaAlumno = e.target.children[1].children[0].children[i].children[1].children[2].children[0].children[1].value;
+            console.log(`Generando alumno ${(i+1)}:\n   - Nombre: ${nombreAlumno} \n   - Apellido: ${apellidoAlumno}\n   - Nota: ${notaAlumno}`);
+            Alumnos.push(new Alumno(i,(i+1),nombreAlumno,apellidoAlumno,notaAlumno));
         }
+        limiparPantalla();
+        tablaResultados();
     });
 
     let btnAtras = document.getElementById("atrasAlumno");
@@ -985,7 +913,7 @@ function compartirRegistro(registro) {
         let promedio = promediar(total,informacion[0].data.length).toFixed(2);
 
         let promedioFinal = document.createElement('div');
-        promedioFinal.innerHTML = `<h5 class="float-start my-3">Promedio general: ${promedio}<h5>
+        promedioFinal.innerHTML = `<h5 class="float-start my-3">Promedio generprial: ${promedio}<h5>
         <button type="button" class="btn btn-success float-end my-3 mx-1" id="btnSalir">Salir</button>`;
         padre.appendChild(promedioFinal);
 
@@ -1092,16 +1020,8 @@ function compartirRegistroBusqueda(busqueda,hash) {
         let btnSalir = document.getElementById("btnVolver");
         btnSalir.addEventListener("click", (e) => {
             limiparPantalla();
-            compartirRegistro(hash);
+            imprimirRegistro(hash);
         });
-        
-        let btnBorrarFiltro = document.getElementById("btnBorrarFiltro");
-        btnBorrarFiltro.addEventListener("click", (e) => {
-            limiparPantalla();
-            console.log(`Regresando al registros: ${hash}`)
-            compartirRegistro(hash);
-        });
-        
     }else {
         let tabla = document.createElement('div');
         tabla.innerHTML = tablaAlumnos;
@@ -1226,13 +1146,6 @@ function busquedaNombreApellido(busqueda,hash) {
         let btnSalir = document.getElementById("btnVolver");
         btnSalir.addEventListener("click", (e) => {
             limiparPantalla();
-            imprimirRegistro(hash);
-        });
-        
-        let btnBorrarFiltro = document.getElementById("btnBorrarFiltro");
-        btnBorrarFiltro.addEventListener("click", (e) => {
-            limiparPantalla();
-            console.log(`Regresando al registros: ${hash}`)
             imprimirRegistro(hash);
         });
     }else {
@@ -1527,7 +1440,6 @@ function imprimirListadoBusqueda(registro){
             </br>
             <button type="button" class="btn btn-danger" id="btnAtrasRegitros">Atras</button>
         </p>`;
-        
         let btnAtrasRegitros = document.getElementById("btnAtrasRegitros");
 
         btnAtrasRegitros.addEventListener("click", (e) => {
